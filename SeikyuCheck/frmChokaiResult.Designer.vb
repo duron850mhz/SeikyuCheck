@@ -152,6 +152,7 @@ Partial Class frmChokaiResult
         Icon = CType(resources.GetObject("$this.Icon"), Icon)
         Margin = New Padding(4)
         Name = "frmChokaiResult"
+        ShowInTaskbar = False
         Text = "比較結果"
         CType(dgv, ComponentModel.ISupportInitialize).EndInit()
         ResumeLayout(False)

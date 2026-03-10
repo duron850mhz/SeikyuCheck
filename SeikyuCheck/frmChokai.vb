@@ -14,13 +14,21 @@ Public Class frmChokai
     End Sub
 
     ''' <summary>
+    ''' データ書き込み
+    ''' </summary>
+    Private Sub I_WriteIni()
+        C_WriteIni(KEY_Chokai, SET_ChokaiHonsyaExcel, txtHonsya.Text)
+        C_WriteIni(KEY_Chokai, SET_ChokaiMeiboExcel, txtMeibo.Text)
+    End Sub
+
+    ''' <summary>
     ''' 設定
     ''' </summary>
     ''' <param name="sender"></param>
     ''' <param name="e"></param>
     Private Sub btnOption_Click(sender As Object, e As EventArgs) Handles btnOption.Click
         Using _frm As New frmOption
-            _frm.ShowDialog(Me)
+            _frm.ShowDialog()
         End Using
     End Sub
 
@@ -30,8 +38,10 @@ Public Class frmChokai
     ''' <param name="sender"></param>
     ''' <param name="e"></param>
     Private Sub btnOK_Click(sender As Object, e As EventArgs) Handles btnOK.Click
+        Call I_WriteIni()
+
         Using _frm As New frmChokaiResult
-            _frm.ShowDialog(Me)
+            _frm.ShowDialog()
         End Using
     End Sub
 
@@ -77,7 +87,6 @@ Public Class frmChokai
     ''' <param name="sender"></param>
     ''' <param name="e"></param>
     Private Sub frmChokai_FormClosing(sender As Object, e As FormClosingEventArgs) Handles Me.FormClosing
-        C_WriteIni(KEY_Chokai, SET_ChokaiHonsyaExcel, txtHonsya.Text)
-        C_WriteIni(KEY_Chokai, SET_ChokaiMeiboExcel, txtMeibo.Text)
+        I_WriteIni()
     End Sub
 End Class

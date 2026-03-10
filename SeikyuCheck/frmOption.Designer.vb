@@ -321,6 +321,7 @@ Partial Class frmOption
         Icon = CType(resources.GetObject("$this.Icon"), Icon)
         Margin = New Padding(4)
         Name = "frmOption"
+        ShowInTaskbar = False
         Text = "設定"
         GroupBox1.ResumeLayout(False)
         GroupBox1.PerformLayout()

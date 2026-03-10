@@ -5,6 +5,17 @@ Imports ExcelDataReader
 Public Class frmChokaiResult
     Dim LG_bSetbyProg As Boolean = False
 
+    Private Class clsHonsyaData
+        Public Property Room As String
+        Public Property Name As String
+        Public Property Amount As Decimal
+    End Class
+    Private Class clsMeiboData
+        Public Property Room As String
+        Public Property Name As String
+        Public Property Memo As String
+    End Class
+
     ''' <summary>
     ''' 初期化
     ''' </summary>
@@ -46,9 +57,25 @@ Public Class frmChokaiResult
     ''' 照合
     ''' </summary>
     Private Sub I_DataSet()
+        ' clear
+        dgv.Rows.Clear()
+
         ' Excelファイルパス
         Dim ExcelHonsya As String = C_ReadIni(KEY_Chokai, SET_ChokaiHonsyaExcel)
         Dim ExcelMeibo As String = C_ReadIni(KEY_Chokai, SET_ChokaiMeiboExcel)
+
+        ' Iniからパラメータ取得  
+        Dim iHonsyaNo As Integer = CInt(C_ReadIni(KEY_Chokai, SET_ChokaiOptionHonsyaNo))
+        Dim iHonsyaName As Integer = CInt(C_ReadIni(KEY_Chokai, SET_ChokaiOptionHonsyaName))
+        Dim iHonsyaMoney As Integer = CInt(C_ReadIni(KEY_Chokai, SET_ChokaiOptionHonsyaMoney))
+        Dim iHonsyaStartRow As Integer = CInt(C_ReadIni(KEY_Chokai, SET_ChokaiOptionHonsyaStartRow))
+        Dim iMeiboNo As Integer = CInt(C_ReadIni(KEY_Chokai, SET_ChokaiOptionMeiboNo))
+        Dim iMeiboName As Integer = CInt(C_ReadIni(KEY_Chokai, SET_ChokaiOptionMeiboName))
+        Dim iMeiboMemo As Integer = CInt(C_ReadIni(KEY_Chokai, SET_ChokaiOptionMeiboMemo))
+        Dim iMeiboStartRow As Integer = CInt(C_ReadIni(KEY_Chokai, SET_ChokaiOptionMeiboStartRow))
+        Dim iMeiboMaxRow As Integer = CInt(C_ReadIni(KEY_Chokai, SET_ChokaiOptionMeiboMaxRow))
+        Dim iMeiboMaxCol As Integer = CInt(C_ReadIni(KEY_Chokai, SET_ChokaiOptionMeiboMaxCol))
+        Dim dMeiboMoney As Decimal = CDec(C_ReadIni(KEY_Chokai, SET_ChokaiOptionMeiboMoney))
 
         ' 存在チェック
         If File.Exists(ExcelHonsya) = False Then
@@ -63,21 +90,86 @@ Public Class frmChokaiResult
             ' ExcelDataReaderの文字化け対策（必須）
             Encoding.RegisterProvider(System.Text.CodePagesEncodingProvider.Instance)
 
+            ' Excelからデータ取得
+            Dim listHonsya As List(Of clsHonsyaData) = I_ReadHonsyaData(ExcelHonsya, iHonsyaNo, iHonsyaName, iHonsyaMoney, iHonsyaStartRow)
+            Dim listMeibo As List(Of clsMeiboData) = I_ReadMeiboData(ExcelMeibo, iMeiboNo, iMeiboName, iMeiboMemo, iMeiboStartRow, iMeiboMaxRow, iMeiboMaxCol)
+
+            ' 想定額
+            Dim expectedAmount As Decimal = dMeiboMoney * cmbMonth.SelectedValue
+
+            ' 1. Room をキーにして両方のリストを結合（Full Outer Join的なアプローチ）
+            ' 全てのRoom（部屋番号）のユニークリストを作成
+            Dim allRooms = listHonsya.Select(Function(h) h.Room).
+                   Union(listMeibo.Select(Function(m) m.Room)).Distinct()
+
+            For Each roomNo In allRooms
+                ' 各リストから該当するRoomのデータを取得（無い場合はNothing）
+                Dim honsya = listHonsya.FirstOrDefault(Function(h) h.Room = roomNo)
+                Dim meibo = listMeibo.FirstOrDefault(Function(m) m.Room = roomNo)
+
+                Dim hAmount As Decimal = If(honsya IsNot Nothing, honsya.Amount, 0)
+                Dim name As String = If(meibo IsNot Nothing, meibo.Name, If(honsya IsNot Nothing, honsya.Name, "不明"))
+
+                ' --- 判定ロジック ---
+
+                ' ① 名簿に無いのに金額が0ではない
+                If meibo Is Nothing AndAlso hAmount <> 0 Then
+                    Call I_AddRow(honsya, meibo) ' データ追加
+                    Continue For
+                End If
+
+                ' ② 名簿にあるのに金額が0
+                If meibo IsNot Nothing AndAlso hAmount = 0 Then
+                    Call I_AddRow(honsya, meibo) ' データ追加
+                    Continue For
+                End If
+
+                ' ③ 金額が想定額と一致しない (両方にデータがある場合)
+                If meibo IsNot Nothing AndAlso honsya IsNot Nothing AndAlso hAmount <> expectedAmount Then
+                    Call I_AddRow(honsya, meibo) ' データ追加
+                    Continue For
+                End If
+
+                ' 正常
+                If chkAllData.Checked Then
+                    Call I_AddRow(honsya, meibo, False) ' データ追加
+                End If
+            Next
 
         Catch ex As Exception
-
+            MessageBox.Show("エラーが発生しました: " & ex.Message, "エラー", MessageBoxButtons.OK, MessageBoxIcon.Error)
         End Try
     End Sub
 
+    Private Sub I_AddRow(ByVal honsya As clsHonsyaData, ByVal meibo As clsMeiboData, Optional ByVal bColor As Boolean = True)
+        dgv.Rows.Add()
+        Dim iRow As Integer = dgv.Rows.Count - 1
+        dgv.Rows(iRow).Cells(col_本社部屋番号.Index).Value = honsya?.Room
+        dgv.Rows(iRow).Cells(col_本社氏名.Index).Value = honsya?.Name
+        dgv.Rows(iRow).Cells(col_本社請求額.Index).Value = If(honsya IsNot Nothing, honsya.Amount.ToString("N0"), "")
+        dgv.Rows(iRow).Cells(col_名簿部屋番号.Index).Value = meibo?.Room
+        dgv.Rows(iRow).Cells(col_名簿氏名.Index).Value = meibo?.Name
+        dgv.Rows(iRow).Cells(col_名簿備考.Index).Value = meibo?.Memo
+
+        If bColor = True And chkAllData.Checked = True Then
+            ' 照合エラー行は赤で表示
+            dgv.Rows(iRow).Cells(col_本社部屋番号.Index).Style.BackColor = Color.Red
+        End If
+    End Sub
+
     ''' <summary>
-    ''' Excelの指定列をHashSetで読み込み（重複排除）
+    ''' Excelから名簿データ取得
     ''' </summary>
     ''' <param name="filePath"></param>
-    ''' <param name="colIndex"></param>
+    ''' <param name="roomIndex"></param>
+    ''' <param name="nameIndex"></param>
+    ''' <param name="memoIndex"></param>
     ''' <param name="dataStartRow"></param>
+    ''' <param name="maxRow"></param>
+    ''' <param name="maxCol"></param>
     ''' <returns></returns>
-    Function I_ReadColumn(filePath As String, colIndex As Integer, dataStartRow As Integer) As HashSet(Of String)
-        Dim result As New HashSet(Of String)
+    Private Function I_ReadMeiboData(filePath As String, roomIndex As Integer, nameIndex As Integer, memoIndex As Integer, dataStartRow As Integer, maxRow As Integer, maxCol As Integer) As List(Of clsMeiboData)
+        Dim result As New List(Of clsMeiboData)
         Using stream = File.Open(filePath, FileMode.Open, FileAccess.Read)
             Using reader = ExcelReaderFactory.CreateReader(stream)
                 Dim ds = reader.AsDataSet(New ExcelDataSetConfiguration() With {
@@ -86,15 +178,33 @@ Public Class frmChokaiResult
                 }
             })
                 Dim table = ds.Tables(0)
-                ' dataStartRow は1始まり（1=1行目からデータ）
-                For rowIdx = dataStartRow - 1 To table.Rows.Count - 1
-                    Dim val = table.Rows(rowIdx)(colIndex)?.ToString().Trim()
-                    If Not String.IsNullOrEmpty(val) Then
-                        result.Add(val)
-                    End If
-                Next
+                Dim iColCount As Integer = 0
+                Do
+                    ' dataStartRow は1始まり（1=1行目からデータ）
+                    For rowIdx = dataStartRow - 1 To maxRow - 1
+                        ' 指定行数ループ
+                        Dim valRoom = table.Rows(rowIdx + iColCount)(roomIndex - 1)?.ToString().Trim()
+                        Dim valName = table.Rows(rowIdx)(nameIndex - 1)?.ToString().Trim()
+                        Dim valMemo = table.Rows(rowIdx)(memoIndex - 1)?.ToString().Trim()
+                        If Not String.IsNullOrEmpty(valRoom) Then
+                            Dim clsVal As New clsMeiboData With {
+                            .Room = valRoom,
+                            .Name = valName,
+                            .Memo = valMemo
+                        }
+                            result.Add(clsVal)
+                        Else
+                            '部屋番号空白はデータ終端とみなす
+                            Exit Do
+                        End If
+                    Next
+
+                    '次のブロックへ
+                    iColCount += maxCol
+                Loop
             End Using
         End Using
+
         Return result
     End Function
 
@@ -106,8 +216,8 @@ Public Class frmChokaiResult
     ''' <param name="amountColIndex"></param>
     ''' <param name="dataStartRow"></param>
     ''' <returns></returns>
-    Function ReadBillingData(filePath As String, roomColIndex As Integer, amountColIndex As Integer, dataStartRow As Integer) As Dictionary(Of String, Decimal)
-        Dim result As New Dictionary(Of String, Decimal)
+    Private Function I_ReadHonsyaData(filePath As String, roomColIndex As Integer, nameIndex As Integer, amountColIndex As Integer, dataStartRow As Integer) As List(Of clsHonsyaData)
+        Dim result As New List(Of clsHonsyaData)
         Using stream = File.Open(filePath, FileMode.Open, FileAccess.Read)
             Using reader = ExcelReaderFactory.CreateReader(stream)
                 Dim ds = reader.AsDataSet(New ExcelDataSetConfiguration() With {
@@ -116,20 +226,33 @@ Public Class frmChokaiResult
                     }
                 })
                 Dim table = ds.Tables(0)
+                ' 終端までループ
                 For rowIdx = dataStartRow - 1 To table.Rows.Count - 1
-                    Dim room = table.Rows(rowIdx)(roomColIndex)?.ToString().Trim()
-                    Dim amountStr = table.Rows(rowIdx)(amountColIndex)?.ToString().Trim()
-                    If String.IsNullOrEmpty(room) Then Continue For
+                    Dim valRoom = table.Rows(rowIdx)(roomColIndex - 1)?.ToString().Trim()
+                    Dim valName = table.Rows(rowIdx)(nameIndex - 1)?.ToString().Trim()
+                    Dim valAmountStr = table.Rows(rowIdx)(amountColIndex - 1)?.ToString().Trim()
+                    ' 部屋番号が空白または数値でない場合はスキップ（空白は終端、数値以外は誤データとみなす）
+                    If (String.IsNullOrEmpty(valRoom) Or IsNumeric(valRoom) = False) Then Continue For
 
+                    ' 請求額は数値以外は0扱い
                     Dim amount As Decimal = 0
-                    Decimal.TryParse(amountStr, amount)
+                    Decimal.TryParse(valAmountStr, amount)
 
-                    If result.ContainsKey(room) Then
-                        result(room) += amount   ' 重複部屋番号は合算
-                    Else
-                        result.Add(room, amount)
-                    End If
+                    ' データ追加
+                    Dim clsVal As New clsHonsyaData With {
+                            .Room = valRoom,
+                            .Name = valName,
+                            .Amount = amount
+                        }
+                    result.Add(clsVal)
                 Next
+
+                ' 部屋番号重複は請求額合算
+                result = result.GroupBy(Function(x) x.Room).Select(Function(g) New clsHonsyaData With {
+                    .Room = g.Key,
+                    .Name = g.First().Name, ' 同一部屋番号の名前は同一とみなす（異なる場合は最初の行の名前を採用）
+                    .Amount = g.Sum(Function(x) x.Amount)
+                }).ToList()
             End Using
         End Using
         Return result
