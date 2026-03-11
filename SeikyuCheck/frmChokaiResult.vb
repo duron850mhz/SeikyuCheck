@@ -45,11 +45,6 @@ Public Class frmChokaiResult
             dgv.Columns(i).DefaultCellStyle.BackColor = Color.LightCyan
         Next
 
-        ' Dummy data
-        For r As Integer = 1 To 40
-            dgv.Rows.Add("101", "山田太郎", "10,000", "101", "山田太郎", "備考")
-        Next
-
         LG_bSetbyProg = False
     End Sub
 
@@ -181,12 +176,14 @@ Public Class frmChokaiResult
                 Dim iColCount As Integer = 0
                 Do
                     ' dataStartRow は1始まり（1=1行目からデータ）
-                    For rowIdx = dataStartRow - 1 To maxRow - 1
+                    For rowIdx = (dataStartRow - 1) To (dataStartRow + maxRow - 1 - 1)
                         ' 指定行数ループ
-                        Dim valRoom = table.Rows(rowIdx + iColCount)(roomIndex - 1)?.ToString().Trim()
-                        Dim valName = table.Rows(rowIdx)(nameIndex - 1)?.ToString().Trim()
-                        Dim valMemo = table.Rows(rowIdx)(memoIndex - 1)?.ToString().Trim()
-                        If Not String.IsNullOrEmpty(valRoom) Then
+                        Dim valRoom = table.Rows(rowIdx)(roomIndex + iColCount - 1)?.ToString().Trim()
+                        Dim valName = table.Rows(rowIdx)(nameIndex + iColCount - 1)?.ToString().Trim()
+                        Dim valMemo = If(memoIndex + iColCount - 1 < table.Columns.Count,
+                                         table.Rows(rowIdx)(memoIndex + iColCount - 1)?.ToString().Trim(),
+                                        "")
+                        If (Not String.IsNullOrEmpty(valRoom)) AndAlso (valRoom <> 0) Then
                             Dim clsVal As New clsMeiboData With {
                             .Room = valRoom,
                             .Name = valName,
@@ -209,7 +206,7 @@ Public Class frmChokaiResult
     End Function
 
     ''' <summary>
-    ''' Excelの指定列をDictionaryで読み込み（部屋番号→請求額、重複部屋番号は請求額合算）
+    ''' 請求データを読み込み
     ''' </summary>
     ''' <param name="filePath"></param>
     ''' <param name="roomColIndex"></param>
@@ -219,7 +216,16 @@ Public Class frmChokaiResult
     Private Function I_ReadHonsyaData(filePath As String, roomColIndex As Integer, nameIndex As Integer, amountColIndex As Integer, dataStartRow As Integer) As List(Of clsHonsyaData)
         Dim result As New List(Of clsHonsyaData)
         Using stream = File.Open(filePath, FileMode.Open, FileAccess.Read)
-            Using reader = ExcelReaderFactory.CreateReader(stream)
+            Dim reader As IExcelDataReader
+            If Path.GetExtension(filePath).Equals(".csv", StringComparison.CurrentCultureIgnoreCase) Then
+                reader = ExcelReaderFactory.CreateCsvReader(stream, New ExcelReaderConfiguration() With {
+                            .FallbackEncoding = System.Text.Encoding.GetEncoding("shift-jis")
+                        })
+            Else
+                reader = ExcelReaderFactory.CreateReader(stream)
+            End If
+
+            Using reader
                 Dim ds = reader.AsDataSet(New ExcelDataSetConfiguration() With {
                     .ConfigureDataTable = Function(tableReader) New ExcelDataTableConfiguration() With {
                         .UseHeaderRow = False

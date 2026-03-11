@@ -56,8 +56,10 @@ Public Class frmChokai
             Select Case True
                 Case sender Is btnHonsyaRef
                     txtTarget = txtHonsya
+                    ofd.Filter = "Excelファイル|*.xlsx;*.xls;*.csv"
                 Case sender Is btnMeiboRef
                     txtTarget = txtMeibo
+                    ofd.Filter = "Excelファイル|*.xlsx;*.xls"
             End Select
 
             ofd.FileName = Path.GetFileName(txtTarget.Text)
@@ -65,7 +67,6 @@ Public Class frmChokai
             ofd.Title = "開くファイルを選択してください"
             ofd.RestoreDirectory = True
 
-            ofd.Filter = "Excelファイル|*.xlsx;*.xls"
             If ofd.ShowDialog(Me) = DialogResult.OK Then
                 txtTarget.Text = ofd.FileName
             End If
