@@ -50,13 +50,10 @@ Module mdl_Ini
     ''' <param name="strKeyName"></param>
     ''' <returns></returns>
     Public Function C_ReadIni(ByVal strSection As String,
-                                     ByVal strKeyName As String) As String
+                              ByVal strKeyName As String) As String
         Try
-            Dim strAppPath As String = System.Reflection.Assembly.GetExecutingAssembly().Location
-            Dim strIniFileName As String = Path.ChangeExtension(strAppPath, "ini")
-
             Dim strWork As System.Text.StringBuilder = New System.Text.StringBuilder(1024)
-            Dim intRet As Integer = GetPrivateProfileString(strSection, strKeyName, "", strWork, strWork.Capacity - 1, strIniFileName)
+            Dim intRet As Integer = GetPrivateProfileString(strSection, strKeyName, "", strWork, strWork.Capacity - 1, C_GetIniPath)
             If intRet > 0 Then
                 Return strWork.ToString
             Else
@@ -76,13 +73,10 @@ Module mdl_Ini
     ''' <param name="strSet"></param>
     ''' <returns></returns>
     Public Function C_WriteIni(ByVal strSection As String,
-                                       ByVal strKeyName As String,
-                                       ByVal strSet As String) As Boolean
+                               ByVal strKeyName As String,
+                               ByVal strSet As String) As Boolean
         Try
-            Dim strAppPath As String = System.Reflection.Assembly.GetExecutingAssembly().Location
-            Dim strIniFileName As String = Path.ChangeExtension(strAppPath, "ini")
-
-            Dim intRet As Integer = WritePrivateProfileString(strSection, strKeyName, strSet, strIniFileName)
+            Dim intRet As Integer = WritePrivateProfileString(strSection, strKeyName, strSet, C_GetIniPath)
             If intRet > 0 Then
                 Return True
             Else
@@ -100,7 +94,7 @@ Module mdl_Ini
     ''' <param name="strKeyName"></param>
     ''' <returns></returns>
     Public Function C_ExistsIni() As Boolean
-        Return File.Exists(Path.ChangeExtension(System.Reflection.Assembly.GetExecutingAssembly().Location, "ini"))
+        Return File.Exists(C_GetIniPath)
     End Function
 
     ''' <summary>
@@ -112,9 +106,9 @@ Module mdl_Ini
         C_WriteIni(KEY_Chokai, SET_ChokaiMeiboExcel, "")
 
         ' frmOption
-        C_WriteIni(KEY_Chokai, SET_ChokaiOptionHonsyaNo, "2")
-        C_WriteIni(KEY_Chokai, SET_ChokaiOptionHonsyaName, "3")
-        C_WriteIni(KEY_Chokai, SET_ChokaiOptionHonsyaMoney, "10")
+        C_WriteIni(KEY_Chokai, SET_ChokaiOptionHonsyaNo, "7")
+        C_WriteIni(KEY_Chokai, SET_ChokaiOptionHonsyaName, "8")
+        C_WriteIni(KEY_Chokai, SET_ChokaiOptionHonsyaMoney, "16")
         C_WriteIni(KEY_Chokai, SET_ChokaiOptionHonsyaStartRow, "2")
         C_WriteIni(KEY_Chokai, SET_ChokaiOptionMeiboNo, "2")
         C_WriteIni(KEY_Chokai, SET_ChokaiOptionMeiboName, "3")
@@ -128,4 +122,15 @@ Module mdl_Ini
         C_WriteIni(KEY_Chokai, SET_ChokaiResultAllData, "False")
         C_WriteIni(KEY_Chokai, SET_ChokaiResultMonth, "2")
     End Sub
+
+    ''' <summary>
+    ''' Iniフルパス取得
+    ''' </summary>
+    ''' <returns></returns>
+    Public Function C_GetIniPath() As String
+        Dim strAppPath As String = Environment.ProcessPath
+        Dim strIniFileName As String = Path.ChangeExtension(strAppPath, "ini")
+
+        Return strIniFileName
+    End Function
 End Module
