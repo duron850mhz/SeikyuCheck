@@ -52,7 +52,7 @@ Module mdl_Ini
     Public Function C_ReadIni(ByVal strSection As String,
                                      ByVal strKeyName As String) As String
         Try
-            Dim strAppPath As String = System.Reflection.Assembly.GetExecutingAssembly().Location
+            Dim strAppPath As String = Environment.ProcessPath
             Dim strIniFileName As String = Path.ChangeExtension(strAppPath, "ini")
 
             Dim strWork As System.Text.StringBuilder = New System.Text.StringBuilder(1024)
@@ -79,7 +79,7 @@ Module mdl_Ini
                                        ByVal strKeyName As String,
                                        ByVal strSet As String) As Boolean
         Try
-            Dim strAppPath As String = System.Reflection.Assembly.GetExecutingAssembly().Location
+            Dim strAppPath As String = Environment.ProcessPath
             Dim strIniFileName As String = Path.ChangeExtension(strAppPath, "ini")
 
             Dim intRet As Integer = WritePrivateProfileString(strSection, strKeyName, strSet, strIniFileName)
